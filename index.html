@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>セブンコード ゲームセンター</title>
+<style>
+  :root{ --bg:#0e0b18; --card:#1a1428; --ink:#f0eaf8; --sub:#9a8cb8;
+    --gold:#ffcf3a; --pink:#ff7fa6; --green:#79bd44; --green-d:#5fa233; }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{
+    font-family:"Hiragino Maru Gothic ProN","Rounded Mplus 1c","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    color:var(--ink); min-height:100dvh;
+    background:
+      radial-gradient(120% 80% at 50% -10%, #2a1d44 0%, #160f26 55%, #0e0b18 100%);
+    display:flex; flex-direction:column; align-items:center; padding:40px 18px 60px;
+  }
+  .head{text-align:center; margin-bottom:32px}
+  .kicker{font-size:12px; letter-spacing:.3em; color:var(--gold); font-weight:800}
+  h1{font-size:32px; font-weight:900; margin:6px 0 4px;
+    text-shadow:3px 3px 0 rgba(0,0,0,.4)}
+  .lead{font-size:13px; color:var(--sub); font-weight:700; line-height:1.7}
+  .grid{display:grid; gap:18px; width:100%; max-width:760px;
+    grid-template-columns:repeat(auto-fit, minmax(220px, 1fr))}
+  .card{
+    background:var(--card); border-radius:20px; overflow:hidden; text-decoration:none;
+    border:2px solid rgba(255,255,255,.06); box-shadow:0 10px 30px rgba(0,0,0,.4);
+    transition:transform .12s, box-shadow .12s, border-color .12s; display:flex; flex-direction:column;
+  }
+  .card:hover{transform:translateY(-6px); box-shadow:0 18px 44px rgba(0,0,0,.55); border-color:rgba(255,207,58,.4)}
+  .thumb{aspect-ratio:16/10; width:100%; overflow:hidden; position:relative; background:#0a0712}
+  .thumb img{width:100%; height:100%; object-fit:cover; image-rendering:pixelated;
+    transition:transform .3s}
+  .card:hover .thumb img{transform:scale(1.06)}
+  .badge{position:absolute; top:8px; left:8px; font-size:10px; font-weight:900; letter-spacing:.05em;
+    padding:3px 9px; border-radius:999px; color:#1a1428}
+  .badge.bb{background:#7fc6e0} .badge.sy{background:var(--pink)}
+  .body{padding:14px 14px 16px}
+  .ttl{font-size:18px; font-weight:900; color:var(--ink)}
+  .desc{font-size:12px; color:var(--sub); font-weight:700; line-height:1.6; margin-top:4px}
+  .play{display:inline-flex; align-items:center; gap:6px; margin-top:12px;
+    background:var(--green); color:#fff; font-weight:900; font-size:13px;
+    padding:8px 18px; border-radius:999px; box-shadow:0 4px 0 var(--green-d)}
+  .foot{margin-top:38px; font-size:11px; color:var(--sub); font-weight:700; text-align:center; line-height:1.8}
+  .foot b{color:var(--gold)}
+</style>
+</head>
+<body>
+  <div class="head">
+    <div class="kicker">SEVEN CODE ・ GAME CENTER</div>
+    <h1>🎮 ゲームセンター</h1>
+    <div class="lead">AIで作ったブラウザゲーム集。<br>カードをタップして遊べます。</div>
+  </div>
+
+  <div class="grid">
+    <a class="card" href="shacchi-run.html">
+      <div class="thumb"><span class="badge sy">社畜る</span><img src="title.png" alt="走れシャッチーくん"></div>
+      <div class="body">
+        <div class="ttl">走れシャッチーくん</div>
+        <div class="desc">ブラック企業から逃げ切れ！タップで跳ねるランナー。</div>
+        <span class="play">▶ あそぶ</span>
+      </div>
+    </a>
+
+    <a class="card" href="tamako-ikusei.html">
+      <div class="thumb"><span class="badge bb">BLACKBOX</span><img src="tamako.png" alt="たまこ育成"></div>
+      <div class="body">
+        <div class="ttl">たまこ育成</div>
+        <div class="desc">新卒「たまこ」を育てる放置×あるある育成ゲーム。</div>
+        <span class="play">▶ あそぶ</span>
+      </div>
+    </a>
+
+    <a class="card" href="tamako-fly.html">
+      <div class="thumb"><span class="badge bb">BLACKBOX</span><img src="tamako.png" alt="たまこフライ"></div>
+      <div class="body">
+        <div class="ttl">たまこフライ</div>
+        <div class="desc">タップで羽ばたく！エンピツの間を抜けるハイスコア。</div>
+        <span class="play">▶ あそぶ</span>
+      </div>
+    </a>
+  </div>
+
+  <div class="foot">
+    作成：AI（Claude Code）／ セブンコード 仮想組織<br>
+    <b>BLACKBOX</b> ― はじめての一歩は、ここから。
+  </div>
+</body>
+</html>

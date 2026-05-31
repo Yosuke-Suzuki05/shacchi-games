@@ -1,0 +1,11 @@
+# ローカル専用・お蔵入り・試作物は公開しない
+ゲームを起動.command
+gaman-no-tsubo.html
+tamako-sprite.html
+
+# 元画像（重い・公開不要。ゲームが使う加工済みPNGのみ公開）
+"ChatGPT Image"*.png
+
+# OS/エディタ
+.DS_Store
+.claude/
