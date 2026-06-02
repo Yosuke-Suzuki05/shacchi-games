@@ -182,7 +182,7 @@ function calcGeom(){
 let state='ready';      // ready / play / over
 let phase='aim';        // aim / dash / fail
 let day, streak, best, hand, spin, greenHalf, yellow, bonusJump, patience, patienceMax,
-    player, parts, flash, flashCol, popup, popT, stopAng, lastT, shake, boss, bossT, result;
+    player, parts, flash, flashCol, popup, popT, stopAng, lastT, shake, boss, bossT, result, peek;
 const SPIN_DIR=1; // 針は必ず時計回り（canvasは角度増加＝時計回り）
 const TARGET=-Math.PI/2; // 12時＝定時
 best=parseInt(localStorage.getItem('teiji_dash_hi')||'0',10);
@@ -292,6 +292,7 @@ function updateHUD(){ document.getElementById('day').textContent=day;
 
 // ===== ループ =====
 function loop(t){ requestAnimationFrame(loop); let dt=(t-(lastT||t))/1000; lastT=t; if(dt>0.05)dt=0.05;
+  updatePeek(dt);              // 窓の社長は全状態で動かす
   if(state==='play') update(dt); draw(); }
 requestAnimationFrame(loop);
 
@@ -357,6 +358,7 @@ function drawRoom(){
   const sky=['#f2a35a','#e8794f','#d96a52','#b5556f'];
   for(let i=0;i<sky.length;i++){ ctx.fillStyle=sky[i]; ctx.fillRect(wx,wy+i*(wh/sky.length),ww,wh/sky.length+1); }
   ctx.fillStyle='rgba(255,235,180,.9)'; ctx.fillRect(wx+ww*0.55,wy+wh*0.18,u*2,u*2);
+  drawWindowPeek(wx,wy,ww,wh);   // ★社長がちらちら覗く（桟の後ろ＝ガラス越し）
   ctx.fillStyle='#2a1d44'; ctx.fillRect(wx+ww/2-u/2,wy,u,wh); ctx.fillRect(wx,wy+wh/2-u/2,ww,u);
   // ドア（EXIT）右側
   drawDoor();
@@ -454,6 +456,39 @@ function drawPlayer(){
   ctx.restore();
 }
 
+// ===== 窓からちらちら覗く社長 =====
+function initPeek(){ peek={phase:'wait', t:0, wait:1.2+Math.random()*3, hold:0.6, sway:Math.random()*7}; }
+function updatePeek(dt){
+  if(!peek) initPeek();
+  peek.t+=dt;
+  if(peek.phase==='wait'){ if(peek.t>=peek.wait){ peek.phase='up'; peek.t=0; peek.sway=Math.random()*7; } }
+  else if(peek.phase==='up'){ if(peek.t>=0.28){ peek.phase='hold'; peek.t=0; peek.hold=0.35+Math.random()*1.0; } }
+  else if(peek.phase==='hold'){ if(peek.t>=peek.hold){ peek.phase='down'; peek.t=0; } }
+  else if(peek.phase==='down'){ if(peek.t>=0.26){ peek.phase='wait'; peek.t=0; peek.wait=2.0+Math.random()*4.5; } }
+}
+function peekAmount(){
+  if(!peek) return 0;
+  const eo=x=>1-(1-x)*(1-x);
+  if(peek.phase==='up')   return eo(Math.min(1,peek.t/0.28));
+  if(peek.phase==='hold') return 1;
+  if(peek.phase==='down') return 1-eo(Math.min(1,peek.t/0.26));
+  return 0;
+}
+function drawWindowPeek(wx,wy,ww,wh){
+  const amt=peekAmount(); if(amt<=0.001 || !bossReady) return;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(wx,wy,ww,wh); ctx.clip();   // ガラスの中だけに描画
+  const bh=wh*1.55, s=bh/bossBox.h, bw=bossBox.w*s;
+  const bx=wx+ww/2 - bw/2 + Math.sin(now()*2.2+peek.sway)*ww*0.05; // 左右にゆらり
+  const hiddenY=wy+wh;                 // 桟の下に完全に隠れた位置
+  const shownY =wy+wh - bh*0.66;       // 顔〜上半身が見える位置まで上がる
+  const by=hiddenY + (shownY-hiddenY)*amt;
+  ctx.imageSmoothingEnabled=false;
+  ctx.filter='drop-shadow(0 0 3px rgba(255,40,70,.8)) drop-shadow(0 0 7px rgba(150,30,200,.6))';
+  ctx.drawImage(bossCanvas, bossBox.minx,bossBox.miny,bossBox.w,bossBox.h, bx,by, bw,bh);
+  ctx.restore();
+}
+
 function drawBoss(){
   if(!boss || !bossReady) return;
   const bh=CHAR_H*1.15, s=bh/bossBox.h, bw=bossBox.w*s;
@@ -512,6 +547,7 @@ function blip(freq,dur){ try{ if(!actx) actx=new (window.AudioContext||window.we
 
 resize();
 initDefaults();
+initPeek();
 </script>
 </body>
 </html>
