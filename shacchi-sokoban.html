@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>シャッチーくんの倉庫番</title>
+<style>
+  :root{ --ink:#2a2230; --pink:#ff7fa6; --gold:#ffcf3a; --green:#79bd44; --green-d:#5fa233; --red:#ff3b54; }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+  html,body{height:100%}
+  body{
+    font-family:"Hiragino Maru Gothic ProN","Rounded Mplus 1c","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    color:#fff; background:#120c1e;
+    display:flex; align-items:center; justify-content:center; min-height:100dvh; overflow:hidden;
+  }
+  #app{position:relative; width:100%; max-width:480px; height:100dvh; max-height:920px;
+    overflow:hidden; display:flex; flex-direction:column; box-shadow:0 0 40px rgba(0,0,0,.4)}
+
+  .topbar{flex:0 0 auto; display:none; align-items:center; justify-content:space-between;
+    padding:12px 16px 6px; gap:8px}
+  .topbar.show{display:flex}
+  .tb-lv{font-size:18px; font-weight:900}
+  .tb-lv b{color:var(--gold)}
+  .tb-mv{font-size:13px; font-weight:800; color:#cbbfda}
+  .tb-mv b{color:#fff}
+
+  .boardwrap{flex:1 1 auto; position:relative; min-height:0}
+  canvas{display:block; width:100%; height:100%; image-rendering:pixelated; image-rendering:crisp-edges; touch-action:none}
+
+  .controls{flex:0 0 auto; display:none; padding:8px 16px 18px; gap:10px; align-items:center; justify-content:space-between}
+  .controls.show{display:flex}
+  .side{display:flex; flex-direction:column; gap:8px}
+  .dpad{display:grid; grid-template-columns:repeat(3,52px); grid-template-rows:repeat(3,52px); gap:6px}
+  .dbtn{border:none; cursor:pointer; font-family:inherit; font-weight:900; font-size:22px; color:#fff;
+    background:#2c2140; border-radius:14px; box-shadow:0 4px 0 #1b1430; transition:transform .06s,box-shadow .06s}
+  .dbtn:active{transform:translateY(3px); box-shadow:0 1px 0 #1b1430}
+  .dbtn.up{grid-area:1/2} .dbtn.left{grid-area:2/1} .dbtn.right{grid-area:2/3} .dbtn.down{grid-area:3/2}
+  .dbtn.mid{grid-area:2/2; background:transparent; box-shadow:none; cursor:default}
+  .mini{border:none; cursor:pointer; font-family:inherit; font-weight:900; font-size:14px; color:#fff;
+    background:#3a2c54; border-radius:12px; padding:11px 16px; box-shadow:0 4px 0 #241a38; white-space:nowrap}
+  .mini:active{transform:translateY(3px); box-shadow:0 1px 0 #241a38}
+  .mini.gold{background:var(--gold); color:#2a2230; box-shadow:0 4px 0 #c9a52e}
+
+  .overlay{position:absolute; inset:0; display:none; flex-direction:column; align-items:center;
+    justify-content:center; text-align:center; padding:24px; z-index:10}
+  .overlay.show{display:flex; animation:fade .3s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .panel{background:rgba(24,14,32,.9); border:2px solid rgba(255,255,255,.12); border-radius:22px;
+    padding:22px 20px; box-shadow:0 14px 40px rgba(0,0,0,.55); width:100%; max-width:360px; backdrop-filter:blur(3px)}
+  .title-img{ width:100%; max-width:440px; image-rendering:pixelated; image-rendering:crisp-edges;
+    border-radius:14px; box-shadow:0 14px 40px rgba(0,0,0,.6); border:2px solid rgba(255,255,255,.1);
+    animation:floaty 3s ease-in-out infinite }
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+  .home-sub{font-size:14px; color:#e9dff5; font-weight:800; margin-top:14px; text-shadow:0 2px 0 rgba(0,0,0,.4)}
+  .home-howto{font-size:12.5px; font-weight:700; line-height:1.8; color:#cbbfda; margin-top:12px}
+  .home-howto b{color:var(--gold)}
+  .kicker{font-size:12px; letter-spacing:.24em; color:var(--gold); font-weight:800}
+  .go-emo{font-size:40px}
+  .go-title{font-size:24px; font-weight:900; margin:2px 0 4px}
+  .go-praise{font-size:13px; font-weight:800; color:var(--gold); margin-bottom:6px}
+  .score-row{display:flex; justify-content:center; gap:26px; margin:8px 0}
+  .sb .lab{font-size:11px; font-weight:800; color:#cbbfda}
+  .sb .num{font-size:30px; font-weight:900; line-height:1}
+  .sb .num.hi{color:var(--gold)}
+  .newbest{display:inline-block; font-size:12px; font-weight:900; color:#2a2230; background:var(--gold);
+    padding:3px 12px; border-radius:999px; margin:4px 0; animation:pulse 1s ease-in-out infinite}
+  @keyframes pulse{50%{transform:scale(1.08)}}
+  .btn{border:none; cursor:pointer; font-family:inherit; font-weight:900; background:var(--green);
+    color:#fff; font-size:18px; padding:14px 40px; border-radius:999px; box-shadow:0 5px 0 var(--green-d);
+    transition:transform .08s,box-shadow .08s; margin-top:14px}
+  .btn:active{transform:translateY(4px); box-shadow:0 1px 0 var(--green-d)}
+  .btn.x{background:#111; color:#fff; box-shadow:0 5px 0 #000}
+  .btn.sub{background:#fff; color:#33263f; box-shadow:0 5px 0 #b9a9cf}
+  .btn-col{display:flex; flex-direction:column; gap:10px; align-items:center; width:100%; margin-top:14px}
+  .brand{margin-top:14px; padding-top:10px; border-top:1px dashed rgba(255,255,255,.18);
+    font-size:11px; color:#9a8cae; font-weight:800; letter-spacing:.06em}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar" id="topbar">
+    <div class="tb-lv">LEVEL <b id="lvNum">1</b><span style="color:#9a8cae">/<span id="lvTot">10</span></span></div>
+    <div class="tb-mv">手数 <b id="mvNum">0</b>　最少 <b id="mvBest">-</b></div>
+  </div>
+
+  <div class="boardwrap"><canvas id="cv"></canvas></div>
+
+  <div class="controls" id="controls">
+    <div class="side">
+      <button class="mini" id="undoBtn">↩ もどす</button>
+      <button class="mini" id="resetBtn">⟲ やり直し</button>
+    </div>
+    <div class="dpad">
+      <button class="dbtn up"    data-d="U">▲</button>
+      <button class="dbtn left"  data-d="L">◀</button>
+      <button class="dbtn mid"></button>
+      <button class="dbtn right" data-d="R">▶</button>
+      <button class="dbtn down"  data-d="D">▼</button>
+    </div>
+  </div>
+
+  <!-- READY -->
+  <div class="overlay show" id="ovReady">
+    <img class="title-img" src="sokoban-title.png" onerror="this.onerror=null;this.src='shacchi.png'" alt="シャッチーくんの倉庫番">
+    <div class="home-sub">〜書類を片付けて定時退社〜</div>
+    <button class="btn" id="startBtn">出社する</button>
+    <div class="home-howto"><b>スワイプ</b>か<b>矢印ボタン</b>でシャッチーを動かす<br>すべての<b>書類箱</b>を<b>緑の棚マーク</b>に押し込めばクリア！<br>箱は<b>押す</b>だけ（引けない）／詰んだら<b>もどす</b></div>
+  </div>
+
+  <!-- LEVEL CLEAR -->
+  <div class="overlay" id="ovClear">
+    <div class="panel">
+      <div class="go-emo">🏃💨</div>
+      <div class="go-title">定時退社！</div>
+      <div class="go-praise" id="clearPraise">片付け完了！</div>
+      <div id="clearBestWrap"></div>
+      <div class="score-row">
+        <div class="sb"><div class="lab">手数</div><div class="num" id="clearMv">0</div></div>
+        <div class="sb"><div class="lab">最少記録</div><div class="num hi" id="clearBest">0</div></div>
+      </div>
+      <div class="btn-col">
+        <button class="btn" id="nextBtn">次の日へ ▶</button>
+        <button class="btn sub" id="replayBtn">この面をやり直し</button>
+      </div>
+      <div class="brand">社畜る ─ syachi9.black</div>
+    </div>
+  </div>
+
+  <!-- ALL CLEAR -->
+  <div class="overlay" id="ovEnd">
+    <div class="panel">
+      <div class="go-emo">🏆</div>
+      <div class="go-title">全10面クリア！</div>
+      <div class="go-praise">伝説の片付け人間…！もう残業はない。</div>
+      <div class="score-row">
+        <div class="sb"><div class="lab">合計手数</div><div class="num" id="endTotal">0</div></div>
+      </div>
+      <div class="btn-col">
+        <button class="btn x" id="shareBtn">𝕏 クリアをシェア</button>
+        <button class="btn sub" id="restartBtn">はじめから</button>
+      </div>
+      <div class="brand">社畜る ─ syachi9.black</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const app=document.getElementById('app');
+const cv=document.getElementById('cv'); const ctx=cv.getContext('2d');
+const boardwrap=document.querySelector('.boardwrap');
+const topbar=document.getElementById('topbar'), controls=document.getElementById('controls');
+const ovReady=document.getElementById('ovReady'), ovClear=document.getElementById('ovClear'), ovEnd=document.getElementById('ovEnd');
+const now=()=>performance.now()/1000;
+
+// ===== シャッチースプライト =====
+const sheet=new Image(); sheet.src='shacchi.png'; let sheetReady=false; sheet.onload=()=>sheetReady=true;
+const FRAMES=[
+  {sx:38,  sy:96,  sw:442, sh:510},  // 走りA
+  {sx:602, sy:40,  sw:368, sh:602},  // ジャンプ
+  {sx:32,  sy:854, sw:478, sh:448},  // パンチ
+  {sx:512, sy:964, sw:460, sh:340},  // 走りB
+];
+const RUN=[0,3];
+
+// ===== レベル（全て解けることをBFSソルバーで検証済み）=====
+const LEVELS=[
+  ["#####","#@$.#","#####"],
+  ["#####","#@  #","#.$ #","#####"],
+  ["#######","#  .  #","# #$# #","#@ $ .#","#######"],
+  ["#######","#@    #","# $#$ #","# . . #","#######"],
+  ["######","#. $@#","#. $ #","#  ###","######"],
+  ["#######","#@$ . #","# # ###","# $ . #","#######"],
+  ["#######","#.    #","#.$$ @#","#.$   #","#######"],
+  ["########","#@ $  .#","# ## ###","# $  . #","########"],
+  ["#######","#. #  #","#  $  #","#.$@$.#","#  $  #","#  #. #","#######"],
+  ["######","#@   #","#.$$.#","#. .##","# $$ #","#   ##","######"],
+];
+const TOTAL=LEVELS.length;
+document.getElementById('lvTot').textContent=TOTAL;
+
+// ===== 状態 =====
+let W,H,DPR, cols,rows, cell,ox,oy;
+let walls,goals,floor,boxes,player,face,stepParity,moves,undoStack;
+let levelIdx=0, totalMoves=0, state='ready';
+let moveAnim=null, win=false, winTimer=0;
+const key=(x,y)=>x+','+y;
+
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  W=boardwrap.clientWidth; H=boardwrap.clientHeight;
+  cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0);
+  layout();
+}
+window.addEventListener('resize',resize);
+
+function layout(){
+  if(!cols) return; const pad=10;
+  cell=Math.floor(Math.min((W-pad*2)/cols,(H-pad*2)/rows));
+  cell=Math.max(8,cell);
+  ox=Math.round((W-cell*cols)/2); oy=Math.round((H-cell*rows)/2);
+}
+
+function loadLevel(i){
+  const rowsArr=LEVELS[i];
+  cols=Math.max(...rowsArr.map(r=>r.length)); rows=rowsArr.length;
+  walls=new Set(); goals=new Set(); boxes=new Set(); player=null;
+  for(let y=0;y<rows;y++){ const line=rowsArr[y];
+    for(let x=0;x<cols;x++){ const c=line[x]||' '; const k=key(x,y);
+      if(c==='#'){ walls.add(k); continue; }
+      if(c==='.'||c==='*'||c==='+') goals.add(k);
+      if(c==='$'||c==='*') boxes.add(k);
+      if(c==='@'||c==='+') player={x,y};
+    }
+  }
+  // 室内床（プレイヤーから到達できる非壁マス）をフラッドフィルで特定
+  floor=new Set(); const st=[key(player.x,player.y)];
+  while(st.length){ const p=st.pop(); if(floor.has(p)||walls.has(p)) continue; floor.add(p);
+    const [px,py]=p.split(',').map(Number);
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx=px+dx,ny=py+dy;
+      if(nx<0||ny<0||nx>=cols||ny>=rows) continue; const nk=key(nx,ny);
+      if(!walls.has(nk)&&!floor.has(nk)) st.push(nk); } }
+  face=1; stepParity=0; moves=0; undoStack=[]; moveAnim=null; win=false; winTimer=0;
+  layout(); updateHUD();
+}
+
+function updateHUD(){
+  document.getElementById('lvNum').textContent=levelIdx+1;
+  document.getElementById('mvNum').textContent=moves;
+  const b=bestOf(levelIdx);
+  document.getElementById('mvBest').textContent=b?b:'-';
+}
+function bestKey(i){ return 'sok_best_'+i; }
+function bestOf(i){ return parseInt(localStorage.getItem(bestKey(i))||'0',10); }
+
+// ===== 入力 =====
+const DIR={U:[0,-1],D:[0,1],L:[-1,0],R:[1,0]};
+function tryMove(dx,dy){
+  if(state!=='play'||win||moveAnim) return;
+  const nx=player.x+dx, ny=player.y+dy, nk=key(nx,ny);
+  if(walls.has(nk)) return;
+  let box=null;
+  if(boxes.has(nk)){
+    const bx=nx+dx, by=ny+dy, bk=key(bx,by);
+    if(walls.has(bk)||boxes.has(bk)) return;
+    box={x0:nx,y0:ny,x1:bx,y1:by};
+  }
+  undoStack.push({px:player.x,py:player.y,boxes:[...boxes],moves});
+  const px0=player.x, py0=player.y;
+  if(box){ boxes.delete(key(box.x0,box.y0)); boxes.add(key(box.x1,box.y1)); }
+  player.x=nx; player.y=ny; moves++; face=dx<0?-1:(dx>0?1:face); stepParity^=1;
+  moveAnim={t:0, dur:0.085, px0,py0, box};
+  blip(box?300:420,0.03);
+  updateHUD();
+  checkWin();
+}
+function undo(){
+  if(state!=='play'||win||!undoStack.length) return;
+  const s=undoStack.pop(); player.x=s.px; player.y=s.py;
+  boxes=new Set(s.boxes); moves=s.moves; moveAnim=null; blip(240,0.04); updateHUD();
+}
+function resetLevel(){ if(state!=='play') return; loadLevel(levelIdx); blip(200,0.05); }
+
+function checkWin(){
+  for(const g of goals){ if(!boxes.has(g)) return; }
+  win=true; winTimer=0; blip(900,0.08); setTimeout(()=>blip(1200,0.1),110); setTimeout(()=>blip(1500,0.12),230);
+}
+
+// D-pad
+controls.querySelectorAll('.dbtn[data-d]').forEach(b=>{
+  b.addEventListener('pointerdown', e=>{ e.preventDefault(); const d=DIR[b.dataset.d]; tryMove(d[0],d[1]); });
+});
+document.getElementById('undoBtn').onclick=undo;
+document.getElementById('resetBtn').onclick=resetLevel;
+window.addEventListener('keydown', e=>{
+  const m={ArrowUp:'U',ArrowDown:'D',ArrowLeft:'L',ArrowRight:'R',w:'U',s:'D',a:'L',d:'R',W:'U',S:'D',A:'L',D:'R'};
+  if(m[e.key]){ e.preventDefault(); const v=DIR[m[e.key]]; tryMove(v[0],v[1]); }
+  else if(e.key==='z'||e.key==='Z') undo();
+  else if(e.key==='r'||e.key==='R') resetLevel();
+});
+// スワイプ
+let ps=null;
+cv.addEventListener('pointerdown', e=>{ ps={x:e.clientX,y:e.clientY}; });
+cv.addEventListener('pointerup', e=>{
+  if(!ps) return; const dx=e.clientX-ps.x, dy=e.clientY-ps.y; ps=null;
+  if(Math.abs(dx)<18 && Math.abs(dy)<18) return;
+  if(Math.abs(dx)>Math.abs(dy)) tryMove(dx>0?1:-1,0); else tryMove(0,dy>0?1:-1);
+});
+
+// ボタン
+document.getElementById('startBtn').onclick=()=>{ levelIdx=0; totalMoves=0; startLevel(); };
+document.getElementById('nextBtn').onclick=()=>{ levelIdx++; if(levelIdx>=TOTAL){ showEnd(); } else { startLevel(); } };
+document.getElementById('replayBtn').onclick=()=>{ startLevel(); };
+document.getElementById('restartBtn').onclick=()=>{ levelIdx=0; totalMoves=0; startLevel(); };
+document.getElementById('shareBtn').onclick=shareX;
+
+function startLevel(){
+  loadLevel(levelIdx); state='play';
+  ovReady.classList.remove('show'); ovClear.classList.remove('show'); ovEnd.classList.remove('show');
+  topbar.classList.add('show'); controls.classList.add('show');
+}
+function levelClear(){
+  state='clear'; totalMoves+=moves;
+  const prev=bestOf(levelIdx); const isBest = !prev || moves<prev;
+  if(isBest) localStorage.setItem(bestKey(levelIdx), String(moves));
+  document.getElementById('clearMv').textContent=moves;
+  document.getElementById('clearBest').textContent=isBest?moves:prev;
+  document.getElementById('clearBestWrap').innerHTML = isBest?'<div class="newbest">🎉 最少手数を更新！</div>':'';
+  document.getElementById('nextBtn').textContent = (levelIdx>=TOTAL-1)?'結果を見る ▶':'次の日へ ▶';
+  ovClear.classList.add('show'); topbar.classList.remove('show'); controls.classList.remove('show');
+}
+function showEnd(){
+  state='end'; document.getElementById('endTotal').textContent=totalMoves;
+  ovClear.classList.remove('show'); ovEnd.classList.add('show');
+}
+
+// ===== ループ =====
+let lastT=0;
+function loop(t){ requestAnimationFrame(loop); let dt=(t-(lastT||t))/1000; lastT=t; if(dt>0.05)dt=0.05;
+  if(moveAnim){ moveAnim.t+=dt; if(moveAnim.t>=moveAnim.dur) moveAnim=null; }
+  if(win){ winTimer+=dt; if(winTimer>0.55 && state==='play') levelClear(); }
+  draw();
+}
+requestAnimationFrame(loop);
+
+// ===== 描画 =====
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  if(!cols) return;
+  // 室内の床
+  for(const f of floor) drawFloor(...f.split(',').map(Number));
+  // 壁（床に隣接するものだけ＝室内の囲い）
+  for(const w of walls){ const [x,y]=w.split(',').map(Number); if(wallVisible(x,y)) drawWall(x,y); }
+  // 棚マーク（ゴール）
+  for(const g of goals){ const [x,y]=g.split(',').map(Number); drawGoal(x,y, boxes.has(g)); }
+  // 箱
+  for(const b of boxes){ let [x,y]=b.split(',').map(Number);
+    if(moveAnim&&moveAnim.box&&moveAnim.box.x1===x&&moveAnim.box.y1===y){
+      const k=ease(moveAnim.t/moveAnim.dur); x=lerp(moveAnim.box.x0,x,k); y=lerp(moveAnim.box.y0,y,k);
+    }
+    drawBox(x,y, goals.has(b));
+  }
+  // プレイヤー
+  let px=player.x, py=player.y;
+  if(moveAnim){ const k=ease(moveAnim.t/moveAnim.dur); px=lerp(moveAnim.px0,px,k); py=lerp(moveAnim.py0,py,k); }
+  drawPlayer(px,py);
+}
+function lerp(a,b,t){ return a+(b-a)*t; }
+function ease(t){ t=Math.max(0,Math.min(1,t)); return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2; }
+function wallVisible(x,y){
+  for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){ if(floor.has(key(x+dx,y+dy))) return true; }
+  return false;
+}
+function cellRect(x,y){ return [ox+x*cell, oy+y*cell, cell, cell]; }
+
+function drawFloor(x,y){
+  const [rx,ry]=cellRect(x,y);
+  ctx.fillStyle = ((x+y)&1)?'#241a38':'#2a1f42';
+  ctx.fillRect(rx,ry,cell,cell);
+  ctx.fillStyle='rgba(255,255,255,.03)'; ctx.fillRect(rx,ry,cell,2);
+}
+function drawWall(x,y){
+  const [rx,ry]=cellRect(x,y); const u=Math.max(2,Math.floor(cell/12));
+  ctx.fillStyle='#130e22'; ctx.fillRect(rx,ry,cell,cell);
+  ctx.fillStyle='#3a2c54'; ctx.fillRect(rx+u,ry+u,cell-u*2,cell-u*2);
+  ctx.fillStyle='#4a3a6a'; ctx.fillRect(rx+u,ry+u,cell-u*2,Math.floor((cell-u*2)*0.42));
+  ctx.fillStyle='rgba(0,0,0,.25)'; ctx.fillRect(rx+u,ry+cell-u*2,cell-u*2,u);
+}
+function drawGoal(x,y,filled){
+  const [rx,ry]=cellRect(x,y); const cx=rx+cell/2, cy=ry+cell/2; const r=cell*0.28;
+  ctx.save();
+  ctx.strokeStyle = filled?'rgba(121,189,68,.0)':'rgba(121,189,68,.95)';
+  ctx.lineWidth=Math.max(2,cell*0.05);
+  ctx.setLineDash([cell*0.16, cell*0.10]);
+  ctx.strokeRect(rx+cell*0.22, ry+cell*0.22, cell*0.56, cell*0.56);
+  ctx.setLineDash([]);
+  ctx.fillStyle = filled?'rgba(121,189,68,.0)':'rgba(121,189,68,.85)';
+  ctx.font='900 '+Math.round(cell*0.28)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('棚', cx, cy);
+  ctx.restore();
+}
+function drawBox(x,y,onGoal){
+  const [rx,ry]=cellRect(x,y); const p=Math.round(cell*0.12); const s=cell-p*2;
+  const bx=rx+p, by=ry+p;
+  // 影
+  ctx.fillStyle='rgba(0,0,0,.3)'; rr(bx+2,by+s*0.9,s,s*0.16,4); ctx.fill();
+  // 本体（段ボール）
+  ctx.fillStyle = onGoal?'#9bbf5a':'#c08a44'; rr(bx,by,s,s,Math.max(3,s*0.10)); ctx.fill();
+  ctx.fillStyle = onGoal?'#b6d678':'#d8a258'; rr(bx,by,s,s*0.5,Math.max(3,s*0.10)); ctx.fill();
+  // テープ＆書類
+  ctx.fillStyle='rgba(0,0,0,.18)'; ctx.fillRect(bx+s*0.46,by,s*0.08,s);
+  ctx.fillStyle='#fff6e0'; ctx.fillRect(bx+s*0.20,by-s*0.14,s*0.6,s*0.22);
+  ctx.fillStyle='rgba(0,0,0,.12)'; ctx.fillRect(bx+s*0.28,by-s*0.06,s*0.44,s*0.03);
+  // 枠
+  ctx.strokeStyle='rgba(0,0,0,.35)'; ctx.lineWidth=Math.max(1,s*0.04); rr(bx,by,s,s,Math.max(3,s*0.10)); ctx.stroke();
+  if(onGoal){ // チェック
+    ctx.strokeStyle='#2e6e1f'; ctx.lineWidth=Math.max(2,s*0.10); ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(bx+s*0.30,by+s*0.55); ctx.lineTo(bx+s*0.45,by+s*0.70); ctx.lineTo(bx+s*0.72,by+s*0.34); ctx.stroke();
+  }
+}
+function drawPlayer(x,y){
+  const [rx,ry]=cellRect(x,y);
+  const cx=rx+cell/2, bottom=ry+cell*0.94;
+  if(!sheetReady){ ctx.fillStyle='#ff7fa6'; ctx.beginPath(); ctx.arc(cx,ry+cell/2,cell*0.32,0,7); ctx.fill(); return; }
+  const f=FRAMES[RUN[win?0:stepParity]];
+  const h=cell*1.16, s=h/f.sh, w=f.sw*s;
+  const dx=cx-w/2, dy=bottom-h;
+  ctx.save(); ctx.fillStyle='rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(cx,bottom,w*0.32,cell*0.09,0,0,7); ctx.fill(); ctx.restore();
+  ctx.save(); ctx.imageSmoothingEnabled=false;
+  if(face<0){ ctx.translate(cx,0); ctx.scale(-1,1); ctx.translate(-cx,0); }
+  ctx.filter='drop-shadow(0 0 2px rgba(255,255,255,.85)) drop-shadow(0 0 6px rgba(255,221,120,.6))';
+  ctx.drawImage(sheet, f.sx,f.sy,f.sw,f.sh, dx,dy, w,h);
+  ctx.restore();
+}
+function rr(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+// ===== シェア =====
+const SHARE_URL='https://yosuke-suzuki05.github.io/shacchi-games/shacchi-sokoban.html';
+function shareX(){
+  let text=`【シャッチーくんの倉庫番】全${TOTAL}面クリア！書類を片付けて定時退社🏃💨 合計${totalMoves}手\n\nあなたは詰まずに帰れる？\n#シャッチーくんの倉庫番 #社畜る`;
+  let url='https://twitter.com/intent/tweet?text='+encodeURIComponent(text);
+  if(SHARE_URL) url+='&url='+encodeURIComponent(SHARE_URL);
+  window.open(url,'_blank');
+}
+
+// ===== SE =====
+let actx;
+function blip(freq,dur){ try{ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)();
+  const o=actx.createOscillator(),g=actx.createGain(); o.type='square'; o.frequency.value=freq;
+  g.gain.value=0.04; o.connect(g); g.connect(actx.destination); o.start();
+  g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+dur); o.stop(actx.currentTime+dur+0.02);}catch(e){} }
+
+resize();
+</script>
+</body>
+</html>
