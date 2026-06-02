@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>定時ダッシュ</title>
+<style>
+  :root{ --ink:#2a2230; --pink:#ff7fa6; --gold:#ffcf3a; --green:#79bd44; --green-d:#5fa233; --red:#ff3b54; }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+  html,body{height:100%}
+  body{
+    font-family:"Hiragino Maru Gothic ProN","Rounded Mplus 1c","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    color:#fff; background:#120c1e;
+    display:flex; align-items:center; justify-content:center; min-height:100dvh; overflow:hidden;
+  }
+  #app{position:relative; width:100%; max-width:480px; height:100dvh; max-height:920px;
+    overflow:hidden; touch-action:manipulation; cursor:pointer; box-shadow:0 0 40px rgba(0,0,0,.4)}
+  canvas{display:block; width:100%; height:100%; image-rendering:pixelated; image-rendering:crisp-edges}
+
+  .overlay{position:absolute; inset:0; display:none; flex-direction:column; align-items:center;
+    justify-content:center; text-align:center; padding:24px; z-index:10}
+  .overlay.show{display:flex; animation:fade .3s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  .panel{background:rgba(24,14,32,.88); border:2px solid rgba(255,255,255,.12); border-radius:22px;
+    padding:22px 20px; box-shadow:0 14px 40px rgba(0,0,0,.55); width:100%; max-width:360px; backdrop-filter:blur(3px)}
+
+  .kicker{font-size:12px; letter-spacing:.24em; color:var(--gold); font-weight:800}
+  .title{font-size:42px; font-weight:900; line-height:1.05; margin:4px 0 2px;
+    text-shadow:3px 3px 0 #2e8a2e, 6px 6px 0 rgba(0,0,0,.35)}
+  .title .g{color:var(--green)}
+  .sub{font-size:13px; color:#cbbfda; font-weight:700; margin:8px 0 12px}
+  .story{font-size:12.5px; line-height:1.7; color:#e9dff5; font-weight:700; background:rgba(255,255,255,.06);
+    border-radius:12px; padding:10px 12px; margin-bottom:12px; text-align:left}
+  .story b{color:var(--gold)}
+  .home-howto{font-size:12.5px; font-weight:700; line-height:1.8; color:#cbbfda; margin-top:14px}
+  .home-howto b{color:var(--gold)}
+  .btn{border:none; cursor:pointer; font-family:inherit; font-weight:900; background:var(--green);
+    color:#fff; font-size:18px; padding:14px 40px; border-radius:999px; box-shadow:0 5px 0 var(--green-d);
+    transition:transform .08s,box-shadow .08s; margin-top:14px}
+  .btn:active{transform:translateY(4px); box-shadow:0 1px 0 var(--green-d)}
+  .btn.x{background:#111; color:#fff; box-shadow:0 5px 0 #000}
+  .btn.sub{background:#fff; color:#33263f; box-shadow:0 5px 0 #b9a9cf}
+  .btn.home{background:transparent; color:#cbbfda; box-shadow:none; border:2px solid rgba(255,255,255,.25);
+    font-size:15px; padding:11px 30px; margin-top:2px}
+  .btn.home:active{transform:translateY(2px)}
+  .btn-col{display:flex; flex-direction:column; gap:10px; align-items:center; width:100%; margin-top:14px}
+
+  .go-emo{font-size:40px}
+  .go-title{font-size:22px; font-weight:900; margin:2px 0 2px}
+  .go-praise{font-size:13px; font-weight:800; color:var(--gold); margin-bottom:6px}
+  .score-row{display:flex; justify-content:center; gap:26px; margin:6px 0}
+  .sb .lab{font-size:11px; font-weight:800; color:#cbbfda}
+  .sb .num{font-size:32px; font-weight:900; line-height:1}
+  .sb .num.hi{color:var(--gold)}
+  .newbest{display:inline-block; font-size:12px; font-weight:900; color:#2a2230; background:var(--gold);
+    padding:3px 12px; border-radius:999px; margin:4px 0; animation:pulse 1s ease-in-out infinite}
+  @keyframes pulse{50%{transform:scale(1.08)}}
+  .brand{margin-top:14px; padding-top:10px; border-top:1px dashed rgba(255,255,255,.18);
+    font-size:11px; color:#9a8cae; font-weight:800; letter-spacing:.06em}
+
+  #hud{position:absolute; top:16px; left:0; right:0; display:none; justify-content:space-between;
+    padding:0 18px; z-index:5; pointer-events:none}
+  #hud.show{display:flex}
+  .hud-day{font-size:28px; font-weight:900; text-shadow:0 3px 0 rgba(0,0,0,.5)}
+  .hud-day small{font-size:14px; color:var(--gold)}
+  .hud-streak{font-size:20px; font-weight:900; color:var(--gold); text-shadow:0 3px 0 rgba(0,0,0,.5)}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="cv"></canvas>
+
+  <div id="hud">
+    <div class="hud-day">DAY <span id="day">1</span></div>
+    <div class="hud-streak">🏃 連続定時 <span id="streak">0</span></div>
+  </div>
+
+  <!-- READY（ホーム） -->
+  <div class="overlay show" id="ovReady">
+    <div class="panel">
+      <div class="kicker">SEVEN CODE ・ 社畜る</div>
+      <div class="title">🏃 定時<span class="g">ダッシュ</span></div>
+      <div class="sub">〜針を止めて、定時で帰れ〜</div>
+      <div class="story">
+        今日もまた終業ベルが鳴らない。<br>
+        時計の針が <b>定時（緑ゾーン）</b> を指した瞬間にタップして、<br>
+        <b>ハマノーン社長</b>の残業指令が出る前に退社しろ！
+      </div>
+      <button class="btn" id="startBtn">出社する</button>
+      <div class="home-howto"><b>タップ</b>で針を止める／緑ゾーンで止めれば<b>定時退社</b><br>赤い<b>残業ゾーン</b>と時間切れに注意！</div>
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div class="overlay" id="ovOver">
+    <div class="panel">
+      <div class="go-emo" id="goEmo">💢</div>
+      <div class="go-title" id="goTitle">残業確定…</div>
+      <div class="go-praise" id="goPraise"></div>
+      <div id="newBestWrap"></div>
+      <div class="score-row">
+        <div class="sb"><div class="lab">連続定時</div><div class="num" id="goStreak">0</div></div>
+        <div class="sb"><div class="lab">BEST</div><div class="num hi" id="goBest">0</div></div>
+      </div>
+      <div class="btn-col">
+        <button class="btn x" id="shareBtn">𝕏 記録をシェア</button>
+        <button class="btn sub" id="retryBtn">もう一回出社</button>
+        <button class="btn home" id="homeBtn">🏠 ホームに戻る</button>
+      </div>
+      <div class="brand">社畜る ─ syachi9.black</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const app=document.getElementById('app');
+const cv=document.getElementById('cv'); const ctx=cv.getContext('2d');
+const ovReady=document.getElementById('ovReady'), ovOver=document.getElementById('ovOver');
+const hud=document.getElementById('hud');
+const now=()=>performance.now()/1000;
+const TAU=Math.PI*2;
+function angDiff(a,b){ return Math.abs(Math.atan2(Math.sin(a-b),Math.cos(a-b))); }
+
+// ===== プレイヤースプライト（1024x1536, 2x2セル）=====
+const sheet=new Image(); sheet.src='shacchi.png'; let sheetReady=false;
+sheet.onload=()=>{ sheetReady=true; };
+// 0:走りA 1:ジャンプ 2:パンチ 3:走りB
+const FRAMES=[
+  {sx:38,  sy:96,  sw:442, sh:510},
+  {sx:602, sy:40,  sw:368, sh:602},
+  {sx:32,  sy:854, sw:478, sh:448},
+  {sx:512, sy:964, sw:460, sh:340},
+];
+const RUN=[0,3], JUMP=1;
+const SPRITE_REF_H=510;
+
+// ===== 追手：ハマノーン社長（白背景を透過処理して使う）=====
+const bossImg=new Image(); bossImg.src='hamanoon.png';
+let bossReady=false, bossCanvas=null, bossBox=null;
+bossImg.onload=()=>{ try{ processBoss(); }catch(e){ console.warn(e); } };
+function processBoss(){
+  const c=document.createElement('canvas'); c.width=bossImg.naturalWidth; c.height=bossImg.naturalHeight;
+  const x=c.getContext('2d'); x.drawImage(bossImg,0,0);
+  const cw=c.width, ch=c.height;
+  const id=x.getImageData(0,0,cw,ch); const d=id.data;
+  const isWhite=(i)=> d[i]>232 && d[i+1]>232 && d[i+2]>232;
+  const seen=new Uint8Array(cw*ch); const stack=[];
+  for(let xx=0;xx<cw;xx++){ stack.push(xx, (ch-1)*cw+xx); }
+  for(let yy=0;yy<ch;yy++){ stack.push(yy*cw, yy*cw+(cw-1)); }
+  while(stack.length){
+    const p=stack.pop(); if(seen[p]) continue; seen[p]=1;
+    const i=p*4; if(!isWhite(i)) continue; d[i+3]=0;
+    const px=p%cw, py=(p/cw)|0;
+    if(px>0)stack.push(p-1); if(px<cw-1)stack.push(p+1);
+    if(py>0)stack.push(p-cw); if(py<ch-1)stack.push(p+cw);
+  }
+  x.putImageData(id,0,0);
+  let minx=cw,miny=ch,maxx=0,maxy=0;
+  for(let y=0;y<ch;y+=2){ for(let xx=0;xx<cw;xx+=2){ if(d[(y*cw+xx)*4+3]>40){
+    if(xx<minx)minx=xx; if(xx>maxx)maxx=xx; if(y<miny)miny=y; if(y>maxy)maxy=y; } } }
+  bossCanvas=c; bossBox={minx,miny,w:maxx-minx,h:maxy-miny}; bossReady=true;
+}
+
+// ===== サイズ =====
+let W,H,DPR;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  W=app.clientWidth; H=app.clientHeight;
+  cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0);
+  calcGeom();
+}
+window.addEventListener('resize',resize);
+
+// ===== ジオメトリ =====
+let CX,CY,R, FLOOR_Y, DOOR_X, START_X, CHAR_H, SPRITE_SCALE;
+function calcGeom(){
+  CX=W*0.50; CY=H*0.36; R=Math.min(W*0.36, H*0.22);
+  FLOOR_Y=H*0.82; DOOR_X=W*0.86; START_X=W*0.28;
+  CHAR_H=W*0.24; SPRITE_SCALE=CHAR_H/SPRITE_REF_H;
+}
+
+// ===== 状態 =====
+let state='ready';      // ready / play / over
+let phase='aim';        // aim / dash / fail
+let day, streak, best, hand, spin, dir, greenHalf, reds, patience, patienceMax,
+    player, parts, flash, flashCol, popup, popT, stopAng, lastT, shake, boss, bossT, result;
+const TARGET=-Math.PI/2; // 12時＝定時
+best=parseInt(localStorage.getItem('teiji_dash_hi')||'0',10);
+
+// タイトル画面の背後にも静止した時計を描けるよう既定値を入れておく
+function initDefaults(){
+  day=1; streak=0; parts=[]; flash=0; popup=''; popT=0; shake=0; boss=null; bossT=0;
+  hand=TARGET-0.9; spin=2; dir=1; greenHalf=0.42; reds=[]; patience=1; patienceMax=1; phase='aim';
+  player={x:START_X, y:FLOOR_Y, run:0, runT:0, hop:0};
+}
+
+function reset(){
+  day=1; streak=0; parts=[]; flash=0; popup=''; popT=0; shake=0; boss=null; bossT=0;
+  player={x:START_X, y:FLOOR_Y, run:0, runT:0, hop:0};
+  startDay();
+  updateHUD();
+}
+
+function startDay(){
+  phase='aim';
+  // 難易度カーブ：針が速く・緑が狭く・残業ゾーンが増える
+  spin = 1.7 + Math.min(day*0.14, 2.6);          // rad/s
+  dir  = Math.random()<0.5 ? 1 : -1;
+  hand = TARGET + (Math.random()*2-1)*1.4;        // ランダム始点
+  greenHalf = Math.max(0.17, 0.52 - day*0.028);   // 緑半幅(rad)
+  patienceMax = Math.max(2.6, 4.6 - day*0.12);    // 社長のガマン秒数
+  patience = patienceMax;
+  // 残業ゾーン（赤）：day3以降に出現、緑から離して配置
+  reds=[];
+  const cnt = day<3?0 : Math.min(3, Math.floor((day-1)/2));
+  for(let i=0;i<cnt;i++){
+    let a, ok, guard=0;
+    do{ a=Math.random()*TAU; ok=angDiff(a,TARGET) > greenHalf+0.55;
+        for(const r of reds) if(angDiff(a,r.c)<0.7) ok=false;
+        guard++; }while(!ok && guard<40);
+    reds.push({c:a, half:0.18+Math.random()*0.12});
+  }
+}
+
+// ===== 入力 =====
+function tap(){
+  if(state!=='play') return;
+  if(phase!=='aim') return;
+  evaluate();
+}
+app.addEventListener('pointerdown', e=>{ if(state==='play'){ e.preventDefault(); tap(); } });
+window.addEventListener('keydown', e=>{ if(e.code==='Space'){ e.preventDefault(); tap(); } });
+document.getElementById('startBtn').onclick=e=>{ e.stopPropagation(); startGame(); };
+document.getElementById('retryBtn').onclick=e=>{ e.stopPropagation(); startGame(); };
+document.getElementById('shareBtn').onclick=e=>{ e.stopPropagation(); shareX(); };
+document.getElementById('homeBtn').onclick=e=>{ e.stopPropagation(); goHome(); };
+
+function goHome(){ state='ready'; ovOver.classList.remove('show'); ovReady.classList.add('show'); hud.classList.remove('show'); }
+function startGame(){ reset(); state='play'; ovReady.classList.remove('show'); ovOver.classList.remove('show');
+  hud.classList.add('show'); lastT=performance.now(); }
+
+function evaluate(){
+  stopAng=hand;
+  const d=angDiff(hand,TARGET);
+  // 残業ゾーン判定
+  let inRed=false;
+  for(const r of reds){ if(angDiff(hand,r.c)<=r.half){ inRed=true; break; } }
+  if(d<=greenHalf && !inRed){
+    // 成功！
+    const perfect = d<=greenHalf*0.34;
+    streak++; flash=1; flashCol='121,189,68';
+    popup = perfect?'PERFECT 定時！':'定時退社！'; popT=1;
+    blip(perfect?1320:990,0.07); if(perfect) setTimeout(()=>blip(1560,0.07),70);
+    spawnSpark(CX, CY);
+    phase='dash'; player.run=0; player.runT=0; bossT=0;
+    updateHUD();
+  }else{
+    fail(inRed?'red':'miss');
+  }
+}
+
+function fail(cause){
+  phase='fail'; shake=20; flash=1; flashCol='255,59,84';
+  boss={t:0}; bossT=0;
+  blip(170,0.16); setTimeout(()=>blip(110,0.18),100);
+  result={cause, streak};
+  setTimeout(()=>gameOverPanel(cause), 900);
+}
+
+function gameOverPanel(cause){
+  state='over'; hud.classList.remove('show');
+  const isBest=streak>best; if(isBest){ best=streak; localStorage.setItem('teiji_dash_hi',String(streak)); }
+  document.getElementById('goStreak').textContent=streak+' 日';
+  document.getElementById('goBest').textContent=best+' 日';
+  document.getElementById('newBestWrap').innerHTML = isBest&&streak>0?'<div class="newbest">🎉 自己ベスト更新！</div>':'';
+  let emo = cause==='red'?'💢':(cause==='timeout'?'⏰':'😱');
+  let t   = cause==='red'?'残業ゾーン直撃…':(cause==='timeout'?'もたもたして残業確定…':'針を外した…残業！');
+  let praise='まだ修行が足りない';
+  if(streak>=30)praise='🏆 伝説の定時人間！';
+  else if(streak>=20)praise='🔥 定時の鬼！';
+  else if(streak>=12)praise='😎 ホワイトな働き方！';
+  else if(streak>=6)praise='その調子！';
+  document.getElementById('goEmo').textContent=emo;
+  document.getElementById('goTitle').textContent=t;
+  document.getElementById('goPraise').textContent=praise;
+  ovOver.classList.add('show');
+}
+
+function updateHUD(){ document.getElementById('day').textContent=day;
+  document.getElementById('streak').textContent=streak; }
+
+// ===== ループ =====
+function loop(t){ requestAnimationFrame(loop); let dt=(t-(lastT||t))/1000; lastT=t; if(dt>0.05)dt=0.05;
+  if(state==='play') update(dt); draw(); }
+requestAnimationFrame(loop);
+
+function update(dt){
+  if(flash>0) flash=Math.max(0,flash-dt*2.4);
+  if(popT>0) popT=Math.max(0,popT-dt);
+  if(shake>0.5) shake*=0.86;
+  for(const p of parts){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=H*1.4*dt; p.life-=dt; }
+  parts=parts.filter(p=>p.life>0);
+
+  if(phase==='aim'){
+    hand += spin*dir*dt;
+    patience -= dt;
+    if(patience<=0){ fail('timeout'); return; }
+  }else if(phase==='dash'){
+    // シャッチーがドアへダッシュして退社→翌日
+    player.runT+=dt; if(player.runT>0.08){ player.runT=0; player.run=(player.run+1)%RUN.length; }
+    player.x += (DOOR_X+W*0.12 - player.x)*Math.min(1, dt*4.2);
+    if(player.x > DOOR_X-2 && bossT===0){ bossT=0.0001; }
+    bossT+=dt;
+    if(bossT>0.7){ // 退社完了→次の日
+      day++; player.x=START_X; player.hop=0;
+      startDay(); updateHUD();
+    }
+  }else if(phase==='fail'){
+    bossT+=dt;
+  }
+}
+
+// ===== 描画 =====
+function draw(){
+  ctx.save();
+  if(shake>0.5) ctx.translate((Math.random()-0.5)*shake,(Math.random()-0.5)*shake);
+
+  drawRoom();
+  drawClock();
+  if(state==='play' && phase!=='fail') drawPatience();
+  drawPlayer();
+  drawBoss();
+
+  for(const pa of parts){ ctx.globalAlpha=Math.max(0,pa.life*2.2); ctx.fillStyle=pa.c;
+    ctx.beginPath(); ctx.arc(pa.x,pa.y,pa.r,0,7); ctx.fill(); }
+  ctx.globalAlpha=1;
+
+  drawPopup();
+  ctx.restore();
+
+  if(flash>0){ ctx.fillStyle='rgba('+flashCol+','+(flash*0.30)+')'; ctx.fillRect(0,0,W,H); }
+}
+
+// オフィスの部屋（ドット絵）
+function drawRoom(){
+  // 壁グラデ（夕方）
+  const bands=['#3a2c54','#43305e','#4d3568','#573a70'];
+  const bh=Math.ceil((FLOOR_Y)/bands.length);
+  for(let i=0;i<bands.length;i++){ ctx.fillStyle=bands[i]; ctx.fillRect(0,i*bh,W,bh+1); }
+  // 床
+  ctx.fillStyle='#241a38'; ctx.fillRect(0,FLOOR_Y,W,H-FLOOR_Y);
+  ctx.fillStyle='#2e2246'; ctx.fillRect(0,FLOOR_Y,W,Math.max(3,W/120));
+  // 窓（夕日）左側
+  const u=Math.max(4,Math.round(W/110));
+  const wx=W*0.10, wy=H*0.10, ww=W*0.20, wh=H*0.16;
+  ctx.fillStyle='#1b1330'; ctx.fillRect(wx-u,wy-u,ww+u*2,wh+u*2);
+  const sky=['#f2a35a','#e8794f','#d96a52','#b5556f'];
+  for(let i=0;i<sky.length;i++){ ctx.fillStyle=sky[i]; ctx.fillRect(wx,wy+i*(wh/sky.length),ww,wh/sky.length+1); }
+  ctx.fillStyle='rgba(255,235,180,.9)'; ctx.fillRect(wx+ww*0.55,wy+wh*0.18,u*2,u*2);
+  ctx.fillStyle='#2a1d44'; ctx.fillRect(wx+ww/2-u/2,wy,u,wh); ctx.fillRect(wx,wy+wh/2-u/2,ww,u);
+  // ドア（EXIT）右側
+  drawDoor();
+  // デスク（プレイヤーの足元あたり）
+  ctx.fillStyle='#3a2a18'; ctx.fillRect(W*0.10,FLOOR_Y-W*0.05,W*0.30,W*0.04);
+  ctx.fillStyle='#2a1d10'; ctx.fillRect(W*0.12,FLOOR_Y-W*0.01,W*0.05,W*0.06);
+  ctx.fillStyle='#2a1d10'; ctx.fillRect(W*0.33,FLOOR_Y-W*0.01,W*0.05,W*0.06);
+}
+function drawDoor(){
+  const dw=W*0.16, dh=H*0.26, dx=DOOR_X-dw*0.3, dy=FLOOR_Y-dh;
+  ctx.fillStyle='#1c1330'; ctx.fillRect(dx-4,dy-4,dw+8,dh+4);
+  ctx.fillStyle='#5a4a30'; ctx.fillRect(dx,dy,dw,dh);
+  ctx.fillStyle='#6e5a3c'; ctx.fillRect(dx+4,dy+4,dw-8,dh-8);
+  ctx.fillStyle='#ffcf3a'; ctx.fillRect(dx+dw-12,dy+dh*0.5-4,6,8);
+  // EXITサイン
+  ctx.fillStyle='#79bd44'; const sw=dw*1.0, sx=dx, sy=dy-H*0.045;
+  ctx.fillRect(sx,sy,sw,H*0.035);
+  ctx.fillStyle='#fff'; ctx.font='900 '+Math.round(H*0.024)+'px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('EXIT', sx+sw/2, sy+H*0.027); ctx.textAlign='left';
+}
+
+// 壁掛け時計（メインのゲージ）
+function drawClock(){
+  // 影＆フチ
+  ctx.fillStyle='rgba(0,0,0,.35)'; ctx.beginPath(); ctx.arc(CX,CY+4,R+10,0,TAU); ctx.fill();
+  ctx.fillStyle='#1d1530'; ctx.beginPath(); ctx.arc(CX,CY,R+9,0,TAU); ctx.fill();
+  ctx.fillStyle='#0f0a1c'; ctx.beginPath(); ctx.arc(CX,CY,R+5,0,TAU); ctx.fill();
+  // 文字盤
+  ctx.fillStyle='#efe7d8'; ctx.beginPath(); ctx.arc(CX,CY,R,0,TAU); ctx.fill();
+
+  // 残業ゾーン（赤）
+  for(const r of reds){
+    ctx.strokeStyle='rgba(255,59,84,.9)'; ctx.lineWidth=R*0.18; ctx.lineCap='butt';
+    ctx.beginPath(); ctx.arc(CX,CY,R*0.80, r.c-r.half, r.c+r.half); ctx.stroke();
+  }
+  // 定時ゾーン（緑）
+  ctx.strokeStyle='rgba(105,200,70,.95)'; ctx.lineWidth=R*0.18;
+  ctx.beginPath(); ctx.arc(CX,CY,R*0.80, TARGET-greenHalf, TARGET+greenHalf); ctx.stroke();
+  // 目盛り
+  ctx.fillStyle='#33263f';
+  for(let i=0;i<12;i++){ const a=i*TAU/12 - Math.PI/2; const big=(i%3===0);
+    const r1=R*0.92, r2=R*(big?0.80:0.86);
+    ctx.save(); ctx.translate(CX,CY); ctx.rotate(a);
+    ctx.fillRect(r2,-(big?2.5:1.4),r1-r2,big?5:2.8); ctx.restore(); }
+  // 「定時」ラベル（12時）
+  ctx.fillStyle='#2e8a2e'; ctx.font='900 '+Math.round(R*0.16)+'px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('定時', CX, CY-R*0.45); ctx.textAlign='left';
+
+  // 針
+  const ha = (phase==='aim')? hand : (stopAng!==undefined?stopAng:hand);
+  ctx.save(); ctx.translate(CX,CY); ctx.rotate(ha);
+  ctx.fillStyle = phase==='fail' ? '#ff3b54' : '#2a2230';
+  ctx.fillRect(-R*0.12,-R*0.045, R*0.92, R*0.09);
+  // 針先の矢印
+  ctx.beginPath(); ctx.moveTo(R*0.80,-R*0.10); ctx.lineTo(R*0.96,0); ctx.lineTo(R*0.80,R*0.10); ctx.fill();
+  ctx.restore();
+  // 中心ハブ
+  ctx.fillStyle='#ffcf3a'; ctx.beginPath(); ctx.arc(CX,CY,R*0.08,0,TAU); ctx.fill();
+  ctx.fillStyle='#33263f'; ctx.beginPath(); ctx.arc(CX,CY,R*0.035,0,TAU); ctx.fill();
+}
+
+// 社長のガマンゲージ
+function drawPatience(){
+  const bw=W*0.62, bh=H*0.018, bx=CX-bw/2, by=CY+R+H*0.045;
+  ctx.fillStyle='rgba(0,0,0,.35)'; roundRectP(bx-3,by-3,bw+6,bh+6,bh); ctx.fill();
+  const rate=Math.max(0,patience/patienceMax);
+  ctx.fillStyle='#2a1d10'; roundRectP(bx,by,bw,bh,bh/2); ctx.fill();
+  ctx.fillStyle = rate>0.4?'#79bd44':(rate>0.18?'#ffcf3a':'#ff3b54');
+  roundRectP(bx,by,bw*rate,bh,bh/2); ctx.fill();
+  ctx.fillStyle='#cbbfda'; ctx.font='900 '+Math.round(H*0.016)+'px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('社長のガマン', CX, by-H*0.012); ctx.textAlign='left';
+}
+
+function drawPlayer(){
+  if(!sheetReady) return;
+  let fi=RUN[0];
+  if(phase==='dash') fi=RUN[player.run];
+  else if(phase==='fail') fi=JUMP;
+  const f=FRAMES[fi];
+  const w=f.sw*SPRITE_SCALE, h=f.sh*SPRITE_SCALE;
+  const dx=player.x - w/2, dy=player.y - h;
+  // 影
+  ctx.save(); ctx.fillStyle='rgba(0,0,0,.30)';
+  ctx.beginPath(); ctx.ellipse(player.x, player.y, w*0.32, 6, 0, 0, TAU); ctx.fill(); ctx.restore();
+  ctx.save(); ctx.imageSmoothingEnabled=false;
+  ctx.filter='drop-shadow(0 0 3px rgba(255,255,255,.9)) drop-shadow(0 0 8px rgba(255,221,120,.75))';
+  ctx.drawImage(sheet, f.sx,f.sy,f.sw,f.sh, dx,dy, w,h);
+  ctx.restore();
+}
+
+function drawBoss(){
+  if(!boss || !bossReady) return;
+  const bh=CHAR_H*1.15, s=bh/bossBox.h, bw=bossBox.w*s;
+  // 失敗時：上からヌッと登場
+  const intro=Math.min(1, boss.t!==undefined?(bossT/0.35):1);
+  const by=FLOOR_Y - bh + Math.sin(now()*7)*5;
+  const bx=W*0.50 - bw/2;
+  const yy = by - (1-intro)*H*0.4;
+  ctx.save(); ctx.imageSmoothingEnabled=false;
+  ctx.filter='drop-shadow(0 0 4px rgba(255,40,70,.95)) drop-shadow(0 0 12px rgba(150,30,200,.8))';
+  ctx.drawImage(bossCanvas, bossBox.minx,bossBox.miny,bossBox.w,bossBox.h, bx,yy, bw,bh);
+  ctx.restore();
+  if(intro>=1){
+    ctx.font='900 '+Math.round(H*0.026)+'px "Hiragino Maru Gothic ProN",sans-serif';
+    const label='残業やっていけ〜！'; const tw=ctx.measureText(label).width;
+    let tx=W*0.5 - tw/2, ty=yy-14; if(tx<6)tx=6; if(tx+tw+14>W)tx=W-tw-14;
+    ctx.fillStyle='#fff'; roundRectP(tx-7,ty-26,tw+16,32,8); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.beginPath();
+    ctx.moveTo(W*0.5-8,ty+5); ctx.lineTo(W*0.5+8,ty+5); ctx.lineTo(W*0.5,ty+16); ctx.fill();
+    ctx.fillStyle='#d9303f'; ctx.fillText(label, tx+1, ty-4);
+  }
+}
+
+function drawPopup(){
+  if(popT<=0||!popup) return;
+  const k=1-popT; const y=CY - R*0.05 - k*H*0.05;
+  ctx.save(); ctx.globalAlpha=Math.min(1,popT*2);
+  ctx.font='900 '+Math.round(W*0.075)+'px "Hiragino Maru Gothic ProN",sans-serif'; ctx.textAlign='center';
+  ctx.lineWidth=6; ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.strokeText(popup, CX, y);
+  ctx.fillStyle='#fff'; ctx.fillText(popup, CX, y);
+  ctx.textAlign='left'; ctx.restore();
+}
+
+function roundRectP(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+function spawnSpark(x,y){ for(let i=0;i<14;i++){ const a=Math.random()*TAU;
+  parts.push({x,y,vx:Math.cos(a)*160,vy:Math.sin(a)*160-40,life:0.4+Math.random()*0.3,c:'#ffcf3a',r:2+Math.random()*3}); } }
+
+// ===== シェア =====
+const SHARE_URL='https://yosuke-suzuki05.github.io/shacchi-games/teiji-dash.html';
+function shareX(){
+  let text=`【定時ダッシュ】${streak}日連続で定時退社できた！🏃💨\n\nハマノーン社長の残業指令をかわして、あなたは何日帰れる？\n#定時ダッシュ #社畜る`;
+  let url='https://twitter.com/intent/tweet?text='+encodeURIComponent(text);
+  if(SHARE_URL) url+='&url='+encodeURIComponent(SHARE_URL);
+  window.open(url,'_blank');
+}
+
+// ===== SE =====
+let actx;
+function blip(freq,dur){ try{ if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)();
+  const o=actx.createOscillator(),g=actx.createGain(); o.type='square'; o.frequency.value=freq;
+  g.gain.value=0.04; o.connect(g); g.connect(actx.destination); o.start();
+  g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+dur); o.stop(actx.currentTime+dur+0.02);}catch(e){} }
+
+resize();
+initDefaults();
+</script>
+</body>
+</html>
