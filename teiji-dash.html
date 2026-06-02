@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>定時ダッシュ</title>
+<title>シャッチーくんの定時退社</title>
 <style>
   :root{ --ink:#2a2230; --pink:#ff7fa6; --gold:#ffcf3a; --green:#79bd44; --green-d:#5fa233; --red:#ff3b54; }
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
@@ -30,6 +30,12 @@
     text-shadow:3px 3px 0 #2e8a2e, 6px 6px 0 rgba(0,0,0,.35)}
   .title .g{color:var(--green)}
   .sub{font-size:13px; color:#cbbfda; font-weight:700; margin:8px 0 12px}
+  /* ホーム（タイトル画像） */
+  .title-img{ width:100%; max-width:440px; image-rendering:pixelated; image-rendering:crisp-edges;
+    border-radius:14px; box-shadow:0 14px 40px rgba(0,0,0,.6); border:2px solid rgba(255,255,255,.1);
+    animation:floaty 3s ease-in-out infinite }
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+  .home-sub{font-size:14px; color:#e9dff5; font-weight:800; margin-top:14px; text-shadow:0 2px 0 rgba(0,0,0,.4)}
   .story{font-size:12.5px; line-height:1.7; color:#e9dff5; font-weight:700; background:rgba(255,255,255,.06);
     border-radius:12px; padding:10px 12px; margin-bottom:12px; text-align:left}
   .story b{color:var(--gold)}
@@ -78,18 +84,10 @@
 
   <!-- READY（ホーム） -->
   <div class="overlay show" id="ovReady">
-    <div class="panel">
-      <div class="kicker">SEVEN CODE ・ 社畜る</div>
-      <div class="title">🏃 定時<span class="g">ダッシュ</span></div>
-      <div class="sub">〜針を止めて、定時で帰れ〜</div>
-      <div class="story">
-        今日もまた終業ベルが鳴らない。<br>
-        時計の針が <b>定時（緑ゾーン）</b> を指した瞬間にタップして、<br>
-        <b>ハマノーン社長</b>の残業指令が出る前に退社しろ！
-      </div>
-      <button class="btn" id="startBtn">出社する</button>
-      <div class="home-howto"><b>タップ</b>で針を止める／緑ゾーンで止めれば<b>定時退社</b><br>赤い<b>残業ゾーン</b>と時間切れに注意！</div>
-    </div>
+    <img class="title-img" src="teiji-title.png" onerror="this.onerror=null;this.src='shacchi.png'" alt="シャッチーくんの定時退社">
+    <div class="home-sub">〜終わらない残業からの脱出〜</div>
+    <button class="btn" id="startBtn">出社する</button>
+    <div class="home-howto"><b>タップ</b>で時計の針を止める／<b>緑ゾーン</b>で止めれば定時退社！<br>5日に1度、緑の中の<b>黄色</b>を狙えば<b>早上がり（+5日）</b>／時間切れに注意</div>
   </div>
 
   <!-- GAME OVER -->
@@ -183,15 +181,16 @@ function calcGeom(){
 // ===== 状態 =====
 let state='ready';      // ready / play / over
 let phase='aim';        // aim / dash / fail
-let day, streak, best, hand, spin, dir, greenHalf, reds, patience, patienceMax,
+let day, streak, best, hand, spin, greenHalf, yellow, bonusJump, patience, patienceMax,
     player, parts, flash, flashCol, popup, popT, stopAng, lastT, shake, boss, bossT, result;
+const SPIN_DIR=1; // 針は必ず時計回り（canvasは角度増加＝時計回り）
 const TARGET=-Math.PI/2; // 12時＝定時
 best=parseInt(localStorage.getItem('teiji_dash_hi')||'0',10);
 
 // タイトル画面の背後にも静止した時計を描けるよう既定値を入れておく
 function initDefaults(){
-  day=1; streak=0; parts=[]; flash=0; popup=''; popT=0; shake=0; boss=null; bossT=0;
-  hand=TARGET-0.9; spin=2; dir=1; greenHalf=0.42; reds=[]; patience=1; patienceMax=1; phase='aim';
+  day=1; streak=0; parts=[]; flash=0; popup=''; popT=0; shake=0; boss=null; bossT=0; bonusJump=1;
+  hand=TARGET-0.9; spin=2; greenHalf=0.42; yellow=null; patience=1; patienceMax=1; phase='aim';
   player={x:START_X, y:FLOOR_Y, run:0, runT:0, hop:0};
 }
 
@@ -203,23 +202,19 @@ function reset(){
 }
 
 function startDay(){
-  phase='aim';
-  // 難易度カーブ：針が速く・緑が狭く・残業ゾーンが増える
-  spin = 1.7 + Math.min(day*0.14, 2.6);          // rad/s
-  dir  = Math.random()<0.5 ? 1 : -1;
+  phase='aim'; bonusJump=1;
+  // 難易度カーブ：針が速く・緑が狭くなる
+  spin = 1.7 + Math.min(day*0.14, 2.6);          // rad/s（向きは常に時計回り）
   hand = TARGET + (Math.random()*2-1)*1.4;        // ランダム始点
   greenHalf = Math.max(0.17, 0.52 - day*0.028);   // 緑半幅(rad)
   patienceMax = Math.max(2.6, 4.6 - day*0.12);    // 社長のガマン秒数
   patience = patienceMax;
-  // 残業ゾーン（赤）：day3以降に出現、緑から離して配置
-  reds=[];
-  const cnt = day<3?0 : Math.min(3, Math.floor((day-1)/2));
-  for(let i=0;i<cnt;i++){
-    let a, ok, guard=0;
-    do{ a=Math.random()*TAU; ok=angDiff(a,TARGET) > greenHalf+0.55;
-        for(const r of reds) if(angDiff(a,r.c)<0.7) ok=false;
-        guard++; }while(!ok && guard<40);
-    reds.push({c:a, half:0.18+Math.random()*0.12});
+  // 早上がりゾーン（黄）：5日に1度、緑の中の“すごく狭い”当たりに出現。決めると+5日。
+  yellow=null;
+  if(day % 5 === 0){
+    const yh = 0.045;                             // 極狭の半幅
+    const room = Math.max(0, greenHalf - yh - 0.03);
+    yellow = { c: TARGET + (Math.random()*2-1)*room, half: yh };
   }
 }
 
@@ -243,21 +238,26 @@ function startGame(){ reset(); state='play'; ovReady.classList.remove('show'); o
 function evaluate(){
   stopAng=hand;
   const d=angDiff(hand,TARGET);
-  // 残業ゾーン判定
-  let inRed=false;
-  for(const r of reds){ if(angDiff(hand,r.c)<=r.half){ inRed=true; break; } }
-  if(d<=greenHalf && !inRed){
-    // 成功！
+  // 早上がりゾーン（黄）判定：決めると+5日ボーナス
+  if(yellow && angDiff(hand, yellow.c) <= yellow.half){
+    streak += 5; flash=1; flashCol='255,207,58'; bonusJump=5;
+    popup='早上がり！ +5日'; popT=1.3;
+    blip(1320,0.07); setTimeout(()=>blip(1560,0.07),70); setTimeout(()=>blip(1860,0.08),150);
+    spawnSpark(CX, CY); spawnSpark(CX, CY);
+    phase='dash'; player.run=0; player.runT=0; bossT=0;
+    updateHUD(); return;
+  }
+  // 定時ゾーン（緑）判定
+  if(d<=greenHalf){
     const perfect = d<=greenHalf*0.34;
-    streak++; flash=1; flashCol='121,189,68';
+    streak++; flash=1; flashCol='121,189,68'; bonusJump=1;
     popup = perfect?'PERFECT 定時！':'定時退社！'; popT=1;
     blip(perfect?1320:990,0.07); if(perfect) setTimeout(()=>blip(1560,0.07),70);
     spawnSpark(CX, CY);
     phase='dash'; player.run=0; player.runT=0; bossT=0;
-    updateHUD();
-  }else{
-    fail(inRed?'red':'miss');
+    updateHUD(); return;
   }
+  fail('miss');
 }
 
 function fail(cause){
@@ -274,8 +274,8 @@ function gameOverPanel(cause){
   document.getElementById('goStreak').textContent=streak+' 日';
   document.getElementById('goBest').textContent=best+' 日';
   document.getElementById('newBestWrap').innerHTML = isBest&&streak>0?'<div class="newbest">🎉 自己ベスト更新！</div>':'';
-  let emo = cause==='red'?'💢':(cause==='timeout'?'⏰':'😱');
-  let t   = cause==='red'?'残業ゾーン直撃…':(cause==='timeout'?'もたもたして残業確定…':'針を外した…残業！');
+  let emo = cause==='timeout'?'⏰':'😱';
+  let t   = cause==='timeout'?'もたもたして残業確定…':'針を外した…残業！';
   let praise='まだ修行が足りない';
   if(streak>=30)praise='🏆 伝説の定時人間！';
   else if(streak>=20)praise='🔥 定時の鬼！';
@@ -303,17 +303,16 @@ function update(dt){
   parts=parts.filter(p=>p.life>0);
 
   if(phase==='aim'){
-    hand += spin*dir*dt;
+    hand += spin*SPIN_DIR*dt;                     // 常に時計回り
     patience -= dt;
     if(patience<=0){ fail('timeout'); return; }
   }else if(phase==='dash'){
-    // シャッチーがドアへダッシュして退社→翌日
+    // シャッチーがドアへダッシュして退社→翌日（早上がりなら+5日）
     player.runT+=dt; if(player.runT>0.08){ player.runT=0; player.run=(player.run+1)%RUN.length; }
     player.x += (DOOR_X+W*0.12 - player.x)*Math.min(1, dt*4.2);
-    if(player.x > DOOR_X-2 && bossT===0){ bossT=0.0001; }
     bossT+=dt;
     if(bossT>0.7){ // 退社完了→次の日
-      day++; player.x=START_X; player.hop=0;
+      day += bonusJump; player.x=START_X; player.hop=0;
       startDay(); updateHUD();
     }
   }else if(phase==='fail'){
@@ -388,14 +387,21 @@ function drawClock(){
   // 文字盤
   ctx.fillStyle='#efe7d8'; ctx.beginPath(); ctx.arc(CX,CY,R,0,TAU); ctx.fill();
 
-  // 残業ゾーン（赤）
-  for(const r of reds){
-    ctx.strokeStyle='rgba(255,59,84,.9)'; ctx.lineWidth=R*0.18; ctx.lineCap='butt';
-    ctx.beginPath(); ctx.arc(CX,CY,R*0.80, r.c-r.half, r.c+r.half); ctx.stroke();
-  }
   // 定時ゾーン（緑）
+  ctx.lineCap='butt';
   ctx.strokeStyle='rgba(105,200,70,.95)'; ctx.lineWidth=R*0.18;
   ctx.beginPath(); ctx.arc(CX,CY,R*0.80, TARGET-greenHalf, TARGET+greenHalf); ctx.stroke();
+  // 早上がりゾーン（黄）：緑の中の極狭な当たり。点滅でキラッと主張
+  if(yellow){
+    const pulse=0.7+0.3*Math.abs(Math.sin(now()*6));
+    ctx.save();
+    ctx.shadowColor='rgba(255,207,58,'+pulse+')'; ctx.shadowBlur=R*0.18;
+    ctx.strokeStyle='#ffe66a'; ctx.lineWidth=R*0.20;
+    ctx.beginPath(); ctx.arc(CX,CY,R*0.80, yellow.c-yellow.half, yellow.c+yellow.half); ctx.stroke();
+    ctx.shadowBlur=0; ctx.strokeStyle='#fff7c0'; ctx.lineWidth=R*0.05;
+    ctx.beginPath(); ctx.arc(CX,CY,R*0.80, yellow.c-yellow.half, yellow.c+yellow.half); ctx.stroke();
+    ctx.restore();
+  }
   // 目盛り
   ctx.fillStyle='#33263f';
   for(let i=0;i<12;i++){ const a=i*TAU/12 - Math.PI/2; const big=(i%3===0);
@@ -491,7 +497,7 @@ function spawnSpark(x,y){ for(let i=0;i<14;i++){ const a=Math.random()*TAU;
 // ===== シェア =====
 const SHARE_URL='https://yosuke-suzuki05.github.io/shacchi-games/teiji-dash.html';
 function shareX(){
-  let text=`【定時ダッシュ】${streak}日連続で定時退社できた！🏃💨\n\nハマノーン社長の残業指令をかわして、あなたは何日帰れる？\n#定時ダッシュ #社畜る`;
+  let text=`【シャッチーくんの定時退社】${streak}日連続で定時退社できた！🏃💨\n\nハマノーン社長の残業指令をかわして、あなたは何日帰れる？\n#シャッチーくんの定時退社 #社畜る`;
   let url='https://twitter.com/intent/tweet?text='+encodeURIComponent(text);
   if(SHARE_URL) url+='&url='+encodeURIComponent(SHARE_URL);
   window.open(url,'_blank');
