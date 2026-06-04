@@ -102,7 +102,7 @@
     <img class="title-img" src="sokoban-title.png" onerror="this.onerror=null;this.src='shacchi.png'" alt="シャッチーくんの定時脱出">
     <div class="home-sub">〜ブロックをずらして定時退社〜</div>
     <button class="btn" id="startBtn">出社する</button>
-    <div class="home-howto">木のブロックを<b>ドラッグ</b>して動かし、<br><b>赤いシャッチー</b>を右の<b>退社ドア</b>から逃がせ！<br>ブロックは向きに沿って<b>スライド</b>するだけ／<b>もどす</b>で何度でも</div>
+    <div class="home-howto">木のブロックを<b>ドラッグ</b>して動かし、<br><b>赤いシャッチー</b>を右の<b>退社ドア</b>から逃がせ！<br>ブロックは向きに沿って<b>スライド</b>するだけ（横は左右・縦は上下）<br>囲まれて動かせない時は<b>他をどかして道を空けよう</b></div>
   </div>
 
   <!-- CLEAR -->
@@ -170,7 +170,7 @@ const DIFF_COLOR={'初級':'#79bd44','中級':'#5bb6e0','上級':'#ffb14c','達�
 // ===== 状態 =====
 let W,H, cell, ox,oy, boardSize;
 let blocks=[], moves=0, undoStack=[], levelIdx=0, state='ready';
-let drag=null, exitAnim=null;
+let drag=null, exitAnim=null, shake=null;
 
 function parseLevel(g){
   const cellsOf={};
@@ -253,6 +253,7 @@ cv.addEventListener('pointerdown', e=>{
   if(i<0) return;
   const [lo,hi]=reachRange(i);
   const b=blocks[i];
+  if(lo===hi){ shake={i,t:0}; blip(150,0.07); return; } // 周囲が塞がって今は動かせない
   drag={ i, axis:b.o, start:(b.o==='h'?b.x:b.y), lo, hi, anchorPx:(b.o==='h'?p.px:p.py), pos:(b.o==='h'?b.x:b.y) };
   cv.setPointerCapture(e.pointerId);
 });
@@ -330,6 +331,7 @@ function showEnd(){ state='end'; ovClear.classList.remove('show'); ovEnd.classLi
 let lastT=0;
 function loop(t){ requestAnimationFrame(loop); let dt=(t-(lastT||t))/1000; lastT=t; if(dt>0.05)dt=0.05;
   if(exitAnim){ exitAnim.t+=dt; if(exitAnim.t>=0.6){ exitAnim=null; levelClear(); } }
+  if(shake){ shake.t+=dt; if(shake.t>=0.4) shake=null; }
   draw();
 }
 requestAnimationFrame(loop);
@@ -340,7 +342,20 @@ function draw(){
   if(state==='ready'){ drawTray(); return; }
   drawTray();
   drawExit();
+  drawRangeHint();
   for(let i=0;i<blocks.length;i++) drawBlock(i);
+}
+// 掴んだブロックの「動かせる範囲」をハイライト
+function drawRangeHint(){
+  if(!drag) return; const b=blocks[drag.i];
+  let rx,ry,rw,rh;
+  if(b.o==='h'){ rx=ox+drag.lo*cell; ry=oy+b.y*cell; rw=(drag.hi+b.len-drag.lo)*cell; rh=cell; }
+  else { rx=ox+b.x*cell; ry=oy+drag.lo*cell; rw=cell; rh=(drag.hi+b.len-drag.lo)*cell; }
+  const pad=cell*0.06;
+  ctx.fillStyle='rgba(255,207,58,.16)';
+  rr(rx+pad,ry+pad,rw-pad*2,rh-pad*2,cell*0.18); ctx.fill();
+  ctx.strokeStyle='rgba(255,207,58,.5)'; ctx.lineWidth=Math.max(2,cell*0.04); ctx.setLineDash([cell*0.16,cell*0.12]);
+  rr(rx+pad,ry+pad,rw-pad*2,rh-pad*2,cell*0.18); ctx.stroke(); ctx.setLineDash([]);
 }
 function rr(x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath(); ctx.moveTo(x+r,y);
   ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
@@ -380,7 +395,9 @@ function drawBlock(i){
   let bx=b.x, by=b.y;
   if(drag&&drag.i===i){ if(b.o==='h')bx=drag.pos; else by=drag.pos; }
   if(exitAnim&&b.main){ bx=exitAnim.fromX + (N+1-exitAnim.fromX)*ease(exitAnim.t/0.6); }
-  const x=ox+bx*cell, y=oy+by*cell;
+  let x=ox+bx*cell, y=oy+by*cell;
+  if(shake&&shake.i===i){ const a=Math.sin(shake.t*64)*(1-shake.t/0.4)*cell*0.12;
+    if(b.o==='h') x+=a; else y+=a; }
   const w=(b.o==='h'?b.len:1)*cell, h=(b.o==='v'?b.len:1)*cell;
   const m=cell*0.08, r=cell*0.22;
   // 影
